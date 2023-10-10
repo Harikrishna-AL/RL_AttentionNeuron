@@ -38,7 +38,7 @@ class AttentionMatrix(nn.Module):
         return torch.div(dot, np.sqrt(self.msg_dim))
 
 
-class SelfAttentionMatrix(nn.Module):
+class SelfAttentionMatrix(AttentionMatrix):
     def __init__(self, dim_in, msg_dim, bias=True, scale=True):
         super(SelfAttentionMatrix, self).__init__(
             dim_q=dim_in,
@@ -170,7 +170,7 @@ class RL_agent(BasePiTorchModel):
             bias=pi_layer_bias,
             scale=pi_layer_scale,
         )
-        self.modules_to_learn.append(self.pi_layer)
+        self.modules_to_learn.append(self.att_neuron)
 
         hidden_lyrs = []
         for layer in range(num_hidden_layers):
