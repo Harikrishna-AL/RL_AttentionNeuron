@@ -27,7 +27,7 @@ class AttentionMatrix(nn.Module):
             self.msg_dim = msg_dim
         else:
             self.msg_dim = 1
-
+    
     def forward(self, q, k):
         q = self.proj_q(q)
         k = self.proj_k(k)
@@ -51,18 +51,22 @@ class SelfAttentionMatrix(AttentionMatrix):
 
 class AttentionNeuron(nn.Module):
     def __init__(
-        self, act_dim, hidden_dim, msg_dim, pos_emb_dim, bias=True, scale=True
+        self, act_dim, hidden_dim, msg_dim, pos_emb_dim, bias=True, scale=True, RL=False
     ):
         super(AttentionNeuron, self).__init__()
         self.act_dim = act_dim
         self.hidden_dim = hidden_dim
         self.msg_dim = msg_dim
         self.pos_emb_dim = pos_emb_dim
+        self.rl = RL
         self.pos_embedding = torch.from_numpy(
             pos_table(self.act_dim, self.pos_emb_dim)
         ).float()
         self.hx = None
-        self.lstm = nn.LSTMCell(input_size=1 + self.act_dim, hidden_size=pos_emb_dim)
+        if self.rl==True:
+            self.lstm = nn.LSTMCell(input_size=1 + self.act_dim, hidden_size=pos_emb_dim)
+        else:
+            self.lstm = nn.LSTMCell(input_size=1, hidden_size=pos_emb_dim)
         self.attention = SelfAttentionMatrix(
             dim_in=pos_emb_dim,
             msg_dim=msg_dim,
@@ -76,16 +80,20 @@ class AttentionNeuron(nn.Module):
         else:
             x = obs.unsqueeze(-1)
         obs_dim = x.shape[0]
-
-        x_aug = torch.cat([x, torch.vstack([prev_act] * obs_dim)], dim=-1)
+        if self.rl==True:
+            x_aug = torch.cat([x, torch.vstack([prev_act] * obs_dim)], dim=-1)
+        else:
+            x_aug = x
         if self.hx is None:
             self.hx = (
                 torch.zeros(obs_dim, self.pos_emb_dim),
                 torch.zeros(obs_dim, self.pos_emb_dim),
             )
+        # print(x_aug.shape, self.hx[0].shape)
         self.hx = self.lstm(x_aug, self.hx)
 
         w = torch.tanh(self.attention(q=self.pos_embedding.to(x.device), k=self.hx[0]))
+        # print(w.shape, x.shape)
         output = torch.matmul(w, x)
         return torch.tanh(output)
 
@@ -154,6 +162,7 @@ class RL_agent(BasePiTorchModel):
         num_hidden_layers=1,
         pi_layer_bias=True,
         pi_layer_scale=True,
+        rl=False,
     ):
         super(RL_agent, self).__init__(device=device)
         self.act_dim = act_dim
@@ -169,6 +178,7 @@ class RL_agent(BasePiTorchModel):
             pos_emb_dim=pos_em_dim,
             bias=pi_layer_bias,
             scale=pi_layer_scale,
+            RL=rl,
         )
         self.modules_to_learn.append(self.att_neuron)
 
@@ -195,3 +205,6 @@ class RL_agent(BasePiTorchModel):
     def reset(self):
         self.prev_act = torch.zeros(1, self.act_dim)
         self.att_neuron.reset()
+
+    def forward(self, obs):
+        return self._get_action(obs)
