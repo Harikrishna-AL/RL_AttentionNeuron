@@ -27,7 +27,7 @@ class AttentionMatrix(nn.Module):
             self.msg_dim = msg_dim
         else:
             self.msg_dim = 1
-    
+
     def forward(self, q, k):
         q = self.proj_q(q)
         k = self.proj_k(k)
@@ -63,8 +63,10 @@ class AttentionNeuron(nn.Module):
             pos_table(self.act_dim, self.pos_emb_dim)
         ).float()
         self.hx = None
-        if self.rl==True:
-            self.lstm = nn.LSTMCell(input_size=1 + self.act_dim, hidden_size=pos_emb_dim)
+        if self.rl == True:
+            self.lstm = nn.LSTMCell(
+                input_size=1 + self.act_dim, hidden_size=pos_emb_dim
+            )
         else:
             self.lstm = nn.LSTMCell(input_size=1, hidden_size=pos_emb_dim)
         self.attention = SelfAttentionMatrix(
@@ -80,7 +82,7 @@ class AttentionNeuron(nn.Module):
         else:
             x = obs.unsqueeze(-1)
         obs_dim = x.shape[0]
-        if self.rl==True:
+        if self.rl == True:
             x_aug = torch.cat([x, torch.vstack([prev_act] * obs_dim)], dim=-1)
         else:
             x_aug = x
