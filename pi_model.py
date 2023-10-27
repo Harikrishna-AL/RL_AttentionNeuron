@@ -68,7 +68,7 @@ class AttentionNeuron(nn.Module):
                 input_size=1 + self.act_dim, hidden_size=pos_emb_dim
             )
         else:
-            self.lstm = nn.LSTMCell(input_size=1, hidden_size=pos_emb_dim)
+            self.lstm = nn.LSTMCell(input_size=243, hidden_size=pos_emb_dim)
         self.attention = SelfAttentionMatrix(
             dim_in=pos_emb_dim,
             msg_dim=msg_dim,
@@ -81,6 +81,7 @@ class AttentionNeuron(nn.Module):
             x = torch.from_numpy(obs.copy()).float().unsqueeze(-1)
         else:
             x = obs.unsqueeze(-1)
+        x = x.view(x.shape[0], x.shape[1])
         obs_dim = x.shape[0]
         if self.rl == True:
             x_aug = torch.cat([x, torch.vstack([prev_act] * obs_dim)], dim=-1)
@@ -210,7 +211,7 @@ class RL_agent(BasePiTorchModel):
         return patches.reshape((-1, self.patch_size, self.patch_size, c)) 
     
     def _get_action(self, obs):
-        obs = self.get_patches(9, obs.permute(1,2,0)).permute(0, 3, 1, 2)
+        obs = self.get_patches(obs.permute(1,2,0)).permute(0, 3, 1, 2)
         obs = torch.flatten(obs, start_dim=1)
         x = self.att_neuron(obs=obs, prev_act=self.prev_act)
         self.prev_act = self.net(x.T)
