@@ -161,6 +161,7 @@ class RL_agent(BasePiTorchModel):
         hidden_dim,
         msg_dim,
         pos_em_dim,
+        patch_size,
         num_hidden_layers=1,
         pi_layer_bias=True,
         pi_layer_scale=True,
@@ -171,6 +172,7 @@ class RL_agent(BasePiTorchModel):
         self.hidden_dim = hidden_dim
         self.msg_dim = msg_dim
         self.pos_em_dim = pos_em_dim
+        self.patch_size = patch_size
         self.prev_act = torch.zeros(1, self.act_dim)
 
         self.att_neuron = AttentionNeuron(
@@ -199,7 +201,17 @@ class RL_agent(BasePiTorchModel):
         )
         self.modules_to_learn.append(self.net)
 
+    def get_patches(self, x):
+        h, w, c = x.size()
+        patches = x.unfold(
+            0, self.patch_size, self.patch_size).permute(0, 3, 1, 2)
+        patches = patches.unfold(
+            2, self.patch_size, self.patch_size).permute(0, 2, 1, 4, 3)
+        return patches.reshape((-1, self.patch_size, self.patch_size, c)) 
+    
     def _get_action(self, obs):
+        obs = self.get_patches(9, obs.permute(1,2,0)).permute(0, 3, 1, 2)
+        obs = torch.flatten(obs, start_dim=1)
         x = self.att_neuron(obs=obs, prev_act=self.prev_act)
         self.prev_act = self.net(x.T)
         return self.prev_act.squeeze(0).cpu().numpy()
