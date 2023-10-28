@@ -16,6 +16,7 @@ hidden_dim = 10
 msg_dim = 10
 pos_em_dim = 10
 num_hidden_layers = 1
+num_classes = 20
 pi_layer_bias = True
 pi_layer_scale = True
 device = "cpu"
@@ -27,7 +28,8 @@ agent = RL_agent(
     hidden_dim=hidden_dim,
     msg_dim=msg_dim,
     pos_em_dim=pos_em_dim,
-    patch_size=9,
+    patch_size=10,
+    num_classes=num_classes,
     num_hidden_layers=num_hidden_layers,
     pi_layer_bias=pi_layer_bias,
     pi_layer_scale=pi_layer_scale,
@@ -52,7 +54,8 @@ for _ in tqdm(range(500)):
     observation = obs
 
 env.close()
-sample_image = torch.randn(3,100,100)
+
+sample_image = torch.randn(3, 100, 100)
 for _ in tqdm(range(50)):
     obs = agent.get_action(sample_image)
     print(obs.shape)

@@ -68,7 +68,7 @@ class AttentionNeuron(nn.Module):
                 input_size=1 + self.act_dim, hidden_size=pos_emb_dim
             )
         else:
-            self.lstm = nn.LSTMCell(input_size=243, hidden_size=pos_emb_dim)
+            self.lstm = nn.LSTMCell(input_size=300, hidden_size=pos_emb_dim)
         self.attention = SelfAttentionMatrix(
             dim_in=pos_emb_dim,
             msg_dim=msg_dim,
@@ -83,6 +83,7 @@ class AttentionNeuron(nn.Module):
             x = obs.unsqueeze(-1)
         x = x.view(x.shape[0], x.shape[1])
         obs_dim = x.shape[0]
+        # print(x.shape)
         if self.rl == True:
             x_aug = torch.cat([x, torch.vstack([prev_act] * obs_dim)], dim=-1)
         else:
@@ -163,6 +164,7 @@ class RL_agent(BasePiTorchModel):
         msg_dim,
         pos_em_dim,
         patch_size,
+        num_classes,
         num_hidden_layers=1,
         pi_layer_bias=True,
         pi_layer_scale=True,
@@ -174,6 +176,7 @@ class RL_agent(BasePiTorchModel):
         self.msg_dim = msg_dim
         self.pos_em_dim = pos_em_dim
         self.patch_size = patch_size
+        self.num_classes = num_classes
         self.prev_act = torch.zeros(1, self.act_dim)
 
         self.att_neuron = AttentionNeuron(
@@ -200,21 +203,27 @@ class RL_agent(BasePiTorchModel):
             nn.Linear(in_features=hidden_dim, out_features=hidden_dim),
             nn.Tanh(),
         )
+        self.out = nn.Linear(
+            in_features=hidden_dim * (self.patch_size**2) * 3,
+            out_features=self.num_classes,
+        )
         self.modules_to_learn.append(self.net)
 
     def get_patches(self, x):
         h, w, c = x.size()
-        patches = x.unfold(
-            0, self.patch_size, self.patch_size).permute(0, 3, 1, 2)
-        patches = patches.unfold(
-            2, self.patch_size, self.patch_size).permute(0, 2, 1, 4, 3)
-        return patches.reshape((-1, self.patch_size, self.patch_size, c)) 
-    
+        patches = x.unfold(0, self.patch_size, self.patch_size).permute(0, 3, 1, 2)
+        patches = patches.unfold(2, self.patch_size, self.patch_size).permute(
+            0, 2, 1, 4, 3
+        )
+        return patches.reshape((-1, self.patch_size, self.patch_size, c))
+
     def _get_action(self, obs):
-        obs = self.get_patches(obs.permute(1,2,0)).permute(0, 3, 1, 2)
+        obs = self.get_patches(obs.permute(1, 2, 0)).permute(0, 3, 1, 2)
         obs = torch.flatten(obs, start_dim=1)
         x = self.att_neuron(obs=obs, prev_act=self.prev_act)
-        self.prev_act = self.net(x.T)
+        x = self.net(x.T)
+        x = torch.flatten(x, start_dim=0)
+        self.prev_act = self.out(x.T)
         return self.prev_act.squeeze(0).cpu().numpy()
 
     def reset(self):
